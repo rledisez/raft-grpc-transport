@@ -37,6 +37,11 @@ func (m *Manager) Register(s *grpc.Server) {
 	pb.RegisterRaftTransportServer(s, gRPCAPI{manager: m})
 }
 
+// SetLocalAddress updates the local address of the Raft Transport.
+func (m *Manager) SetLocalAddress(addr raft.ServerAddress) {
+	m.localAddress = addr
+}
+
 // Transport returns a raft.Transport that communicates over gRPC.
 func (m *Manager) Transport() raft.Transport {
 	return raftAPI{m}
