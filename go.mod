@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v1.1.5 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
-	github.com/hashicorp/raft v1.3.1
+	github.com/hashicorp/raft v1.3.7
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	golang.org/x/net v0.0.0-20210907225631-ff17edfbf26d // indirect
 	golang.org/x/sys v0.0.0-20210906170528-6f6e22806c34 // indirect
