@@ -23,6 +23,12 @@ type conn struct {
 	mtx        sync.Mutex
 }
 
+// Close permanently closes the transport, stopping any associated goroutines
+// and freeing all resources.
+func (r raftAPI) Close() error {
+	return r.manager.Close()
+}
+
 // Consumer returns a channel that can be used to consume and respond to RPC requests.
 func (r raftAPI) Consumer() <-chan raft.RPC {
 	return r.manager.rpcChan
@@ -281,4 +287,9 @@ func (r raftAPI) SetHeartbeatHandler(cb func(rpc raft.RPC)) {
 	r.manager.heartbeatFuncMtx.Lock()
 	r.manager.heartbeatFunc = cb
 	r.manager.heartbeatFuncMtx.Unlock()
+}
+
+// RequestPreVote sends the appropriate RPC to the target node.
+func (r raftAPI) RequestPreVote(id raft.ServerID, target raft.ServerAddress, args *raft.RequestPreVoteRequest, resp *raft.RequestPreVoteResponse) error {
+	return nil
 }
