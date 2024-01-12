@@ -3,8 +3,10 @@ package transport
 import (
 	"context"
 	"io"
+	"time"
 
 	pb "github.com/Jille/raft-grpc-transport/proto"
+	"github.com/armon/go-metrics"
 	"github.com/hashicorp/raft"
 )
 
@@ -26,11 +28,20 @@ func (g gRPCAPI) handleRPC(command interface{}, data io.Reader) (interface{}, er
 	}
 	if isHeartbeat(command) {
 		// We can take the fast path and use the heartbeat callback and skip the queue in g.manager.rpcChan.
-		g.manager.heartbeatFuncMtx.Lock()
-		fn := g.manager.heartbeatFunc
-		g.manager.heartbeatFuncMtx.Unlock()
+		fn := func() func(raft.RPC) {
+			t := time.Now()
+			defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "follower", "AppendEntries", "handleRPC", "getHeartbeatFunc"}, t, []metrics.Label{})
+			g.manager.heartbeatFuncMtx.Lock()
+			fn := g.manager.heartbeatFunc
+			g.manager.heartbeatFuncMtx.Unlock()
+			return fn
+		}()
 		if fn != nil {
-			fn(rpc)
+			func() {
+				t := time.Now()
+				defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "follower", "AppendEntries", "handleRPC", "execHeartbeatFunc"}, t, []metrics.Label{})
+				fn(rpc)
+			}()
 			goto wait
 		}
 	}
@@ -41,6 +52,10 @@ func (g gRPCAPI) handleRPC(command interface{}, data io.Reader) (interface{}, er
 	}
 
 wait:
+	if isHeartbeat(command) {
+		t := time.Now()
+		defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "follower", "AppendEntries", "handleRPC", "pushAppendEntriesResp"}, t, []metrics.Label{})
+	}
 	select {
 	case resp := <-ch:
 		if resp.Error != nil {
@@ -53,11 +68,29 @@ wait:
 }
 
 func (g gRPCAPI) AppendEntries(ctx context.Context, req *pb.AppendEntriesRequest) (*pb.AppendEntriesResponse, error) {
-	resp, err := g.handleRPC(decodeAppendEntriesRequest(req), nil)
+	dec := func() *raft.AppendEntriesRequest {
+		t := time.Now()
+		defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "follower", "AppendEntries", "decodeAppendEntriesRequest"}, t, []metrics.Label{})
+		return decodeAppendEntriesRequest(req)
+	}()
+	resp, err := func() (interface{}, error) {
+		if isHeartbeat(dec) {
+			t := time.Now()
+			defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "follower", "AppendEntries", "handleRPC"}, t, []metrics.Label{})
+		}
+		return g.handleRPC(dec, nil)
+	}()
 	if err != nil {
 		return nil, err
 	}
-	return encodeAppendEntriesResponse(resp.(*raft.AppendEntriesResponse)), nil
+	enc := func() *pb.AppendEntriesResponse {
+		if isHeartbeat(dec) {
+			t := time.Now()
+			defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "follower", "AppendEntries", "encodeAppendEntriesResponse"}, t, []metrics.Label{})
+		}
+		return encodeAppendEntriesResponse(resp.(*raft.AppendEntriesResponse))
+	}()
+	return enc, nil
 }
 
 func (g gRPCAPI) RequestVote(ctx context.Context, req *pb.RequestVoteRequest) (*pb.RequestVoteResponse, error) {

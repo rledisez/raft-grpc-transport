@@ -7,6 +7,7 @@ import (
 	"time"
 
 	pb "github.com/Jille/raft-grpc-transport/proto"
+	"github.com/armon/go-metrics"
 	"github.com/hashicorp/raft"
 	"google.golang.org/grpc"
 )
@@ -59,7 +60,11 @@ func (r raftAPI) getPeer(id raft.ServerID, target raft.ServerAddress) (pb.RaftTr
 
 // AppendEntries sends the appropriate RPC to the target node.
 func (r raftAPI) AppendEntries(id raft.ServerID, target raft.ServerAddress, args *raft.AppendEntriesRequest, resp *raft.AppendEntriesResponse) error {
-	c, err := r.getPeer(id, target)
+	c, err := func() (pb.RaftTransportClient, error) {
+		t := time.Now()
+		defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "transAppendEntries", "getPeer"}, t, []metrics.Label{{Name: "peer_id", Value: string(id)}})
+		return r.getPeer(id, target)
+	}()
 	if err != nil {
 		return err
 	}
@@ -69,11 +74,24 @@ func (r raftAPI) AppendEntries(id raft.ServerID, target raft.ServerAddress, args
 		ctx, cancel = context.WithTimeout(ctx, r.manager.heartbeatTimeout)
 		defer cancel()
 	}
-	ret, err := c.AppendEntries(ctx, encodeAppendEntriesRequest(args))
+	req := func() *pb.AppendEntriesRequest {
+		t := time.Now()
+		defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "transAppendEntries", "encodeAppendEntriesRequest"}, t, []metrics.Label{{Name: "peer_id", Value: string(id)}})
+		return encodeAppendEntriesRequest(args)
+	}()
+	ret, err := func() (*pb.AppendEntriesResponse, error) {
+		t := time.Now()
+		defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "transAppendEntries", "AppendEntries"}, t, []metrics.Label{{Name: "peer_id", Value: string(id)}})
+		return c.AppendEntries(ctx, req)
+	}()
 	if err != nil {
 		return err
 	}
-	*resp = *decodeAppendEntriesResponse(ret)
+	*resp = func() raft.AppendEntriesResponse {
+		t := time.Now()
+		defer metrics.MeasureSinceWithLabels([]string{"raft", "replication", "heartbeat", "transAppendEntries", "decodeAppendEntriesResponse"}, t, []metrics.Label{{Name: "peer_id", Value: string(id)}})
+		return *decodeAppendEntriesResponse(ret)
+	}()
 	return nil
 }
 
