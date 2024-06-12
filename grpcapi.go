@@ -129,6 +129,14 @@ func (g gRPCAPI) AppendEntriesPipeline(s pb.RaftTransport_AppendEntriesPipelineS
 	}
 }
 
+func (g gRPCAPI) RequestPreVote(ctx context.Context, req *pb.RequestPreVoteRequest) (*pb.RequestPreVoteResponse, error) {
+	resp, err := g.handleRPC(decodeRequestPreVoteRequest(req), nil)
+	if err != nil {
+		return nil, err
+	}
+	return encodeRequestPreVoteResponse(resp.(*raft.RequestPreVoteResponse)), nil
+}
+
 func isHeartbeat(command interface{}) bool {
 	req, ok := command.(*raft.AppendEntriesRequest)
 	if !ok {

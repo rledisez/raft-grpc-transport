@@ -24,6 +24,7 @@ const (
 	RaftTransport_RequestVote_FullMethodName           = "/RaftTransport/RequestVote"
 	RaftTransport_TimeoutNow_FullMethodName            = "/RaftTransport/TimeoutNow"
 	RaftTransport_InstallSnapshot_FullMethodName       = "/RaftTransport/InstallSnapshot"
+	RaftTransport_RequestPreVote_FullMethodName        = "/RaftTransport/RequestPreVote"
 )
 
 // RaftTransportClient is the client API for RaftTransport service.
@@ -40,6 +41,8 @@ type RaftTransportClient interface {
 	TimeoutNow(ctx context.Context, in *TimeoutNowRequest, opts ...grpc.CallOption) (*TimeoutNowResponse, error)
 	// InstallSnapshot is the command sent to a Raft peer to bootstrap its log (and state machine) from a snapshot on another peer.
 	InstallSnapshot(ctx context.Context, opts ...grpc.CallOption) (RaftTransport_InstallSnapshotClient, error)
+	// RequestPreVoteRequest is the command used by a candidate to ask a Raft peer for a vote in an election.
+	RequestPreVote(ctx context.Context, in *RequestPreVoteRequest, opts ...grpc.CallOption) (*RequestPreVoteResponse, error)
 }
 
 type raftTransportClient struct {
@@ -147,6 +150,16 @@ func (x *raftTransportInstallSnapshotClient) CloseAndRecv() (*InstallSnapshotRes
 	return m, nil
 }
 
+func (c *raftTransportClient) RequestPreVote(ctx context.Context, in *RequestPreVoteRequest, opts ...grpc.CallOption) (*RequestPreVoteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestPreVoteResponse)
+	err := c.cc.Invoke(ctx, RaftTransport_RequestPreVote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // RaftTransportServer is the server API for RaftTransport service.
 // All implementations must embed UnimplementedRaftTransportServer
 // for forward compatibility
@@ -161,6 +174,8 @@ type RaftTransportServer interface {
 	TimeoutNow(context.Context, *TimeoutNowRequest) (*TimeoutNowResponse, error)
 	// InstallSnapshot is the command sent to a Raft peer to bootstrap its log (and state machine) from a snapshot on another peer.
 	InstallSnapshot(RaftTransport_InstallSnapshotServer) error
+	// RequestPreVoteRequest is the command used by a candidate to ask a Raft peer for a vote in an election.
+	RequestPreVote(context.Context, *RequestPreVoteRequest) (*RequestPreVoteResponse, error)
 	mustEmbedUnimplementedRaftTransportServer()
 }
 
@@ -182,6 +197,9 @@ func (UnimplementedRaftTransportServer) TimeoutNow(context.Context, *TimeoutNowR
 }
 func (UnimplementedRaftTransportServer) InstallSnapshot(RaftTransport_InstallSnapshotServer) error {
 	return status.Errorf(codes.Unimplemented, "method InstallSnapshot not implemented")
+}
+func (UnimplementedRaftTransportServer) RequestPreVote(context.Context, *RequestPreVoteRequest) (*RequestPreVoteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestPreVote not implemented")
 }
 func (UnimplementedRaftTransportServer) mustEmbedUnimplementedRaftTransportServer() {}
 
@@ -302,6 +320,24 @@ func (x *raftTransportInstallSnapshotServer) Recv() (*InstallSnapshotRequest, er
 	return m, nil
 }
 
+func _RaftTransport_RequestPreVote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestPreVoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(RaftTransportServer).RequestPreVote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: RaftTransport_RequestPreVote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(RaftTransportServer).RequestPreVote(ctx, req.(*RequestPreVoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // RaftTransport_ServiceDesc is the grpc.ServiceDesc for RaftTransport service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -320,6 +356,10 @@ var RaftTransport_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TimeoutNow",
 			Handler:    _RaftTransport_TimeoutNow_Handler,
+		},
+		{
+			MethodName: "RequestPreVote",
+			Handler:    _RaftTransport_RequestPreVote_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

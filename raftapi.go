@@ -291,5 +291,14 @@ func (r raftAPI) SetHeartbeatHandler(cb func(rpc raft.RPC)) {
 
 // RequestPreVote sends the appropriate RPC to the target node.
 func (r raftAPI) RequestPreVote(id raft.ServerID, target raft.ServerAddress, args *raft.RequestPreVoteRequest, resp *raft.RequestPreVoteResponse) error {
+	c, err := r.getPeer(id, target)
+	if err != nil {
+		return err
+	}
+	ret, err := c.RequestPreVote(context.TODO(), encodeRequestPreVoteRequest(args))
+	if err != nil {
+		return err
+	}
+	*resp = *decodeRequestPreVoteResponse(ret)
 	return nil
 }
