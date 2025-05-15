@@ -25,9 +25,14 @@ var _ raft.WithPeers = raftAPI{}
 var _ raft.WithPreVote = raftAPI{}
 
 type conn struct {
-	clientConn *grpc.ClientConn
+	clientConn GrpcClientConnCloserInterface
 	client     pb.RaftTransportClient
 	mtx        sync.Mutex
+}
+
+type GrpcClientConnCloserInterface interface {
+	grpc.ClientConnInterface
+	Close() error
 }
 
 // Consumer returns a channel that can be used to consume and respond to RPC requests.
@@ -54,7 +59,7 @@ func (r raftAPI) getPeer(target raft.ServerAddress) (pb.RaftTransportClient, err
 	}
 	defer c.mtx.Unlock()
 	if c.clientConn == nil {
-		conn, err := grpc.Dial(string(target), r.manager.dialOptions...)
+		conn, err := r.manager.connect(string(target), r.manager.dialOptions...)
 		if err != nil {
 			return nil, err
 		}

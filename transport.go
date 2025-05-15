@@ -25,6 +25,7 @@ type Manager struct {
 	heartbeatFuncMtx sync.Mutex
 	heartbeatTimeout time.Duration
 
+	connect                func(string, ...grpc.DialOption) (GrpcClientConnCloserInterface, error)
 	connectionsMtx         sync.Mutex
 	connections            map[raft.ServerAddress]*conn
 	appendEntriesChunkSize int
@@ -36,11 +37,16 @@ type Manager struct {
 
 // New creates both components of raft-grpc-transport: a gRPC service and a Raft Transport.
 func New(localAddress raft.ServerAddress, dialOptions []grpc.DialOption, options ...Option) *Manager {
+	defaultConnect := func(tgt string, opts ...grpc.DialOption) (GrpcClientConnCloserInterface, error) {
+		return grpc.Dial(tgt, opts...)
+	}
+
 	m := &Manager{
 		localAddress: localAddress,
 		dialOptions:  dialOptions,
 
 		rpcChan:                make(chan raft.RPC),
+		connect:                defaultConnect,
 		connections:            map[raft.ServerAddress]*conn{},
 		appendEntriesChunkSize: 4*1024*1024 - 10, // same as gRPC default value (minus some overhead)
 

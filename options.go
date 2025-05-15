@@ -1,6 +1,10 @@
 package transport
 
-import "time"
+import (
+	"time"
+
+	"google.golang.org/grpc"
+)
 
 type Option func(m *Manager)
 
@@ -19,5 +23,12 @@ func WithHeartbeatTimeout(d time.Duration) Option {
 func WithAppendEntriesChunkSize(v int) Option {
 	return func(m *Manager) {
 		m.appendEntriesChunkSize = v
+	}
+}
+
+// WithConnect configures the function to call to get a gRPC connection.
+func WithConnect(f func(string, ...grpc.DialOption) (GrpcClientConnCloserInterface, error)) Option {
+	return func(m *Manager) {
+		m.connect = f
 	}
 }
